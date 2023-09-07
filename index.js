@@ -29,6 +29,7 @@ async function run() {
         await client.connect();
         const foodCollection = client.db('Bistro-Boss').collection('foodItem')
         const reviewCollection = client.db('Bistro-Boss').collection('review')
+        const cartCollection = client.db('Bistro-Boss').collection('cart')
 
         app.post('/food', async (req, res) => {
             console.log(user)
@@ -44,6 +45,21 @@ async function run() {
         app.get('/review', async (req, res) => {
             const result = await reviewCollection.find({}).toArray()
             res.send(result)
+        })
+
+
+        // cart collection
+
+        app.post('/cart',async(req,res)=>{
+            const cartInfo= req.body 
+            //console.log(cartInfo)
+            const result = await cartCollection.insertOne(cartInfo)
+            res.send(result)
+        })
+
+        app.get('/carts',async(req,res)=>{
+            const result= await cartCollection.find({}).toArray()
+            res.send({success:result})
         })
         console.log("connected to MongoDB!");
     } finally {
