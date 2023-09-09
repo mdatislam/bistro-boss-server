@@ -58,9 +58,20 @@ async function run() {
         })
 
         app.get('/carts',async(req,res)=>{
-            const result= await cartCollection.find({}).toArray()
-            res.send({success:result})
+            const email= req.query.email
+            //console.log(email)
+            const result= await cartCollection.find({email:email}).toArray()
+            res.send({data:result})
         })
+
+         app.delete('/cart/:id',async(req,res)=>{
+            const id= req.params.id
+            //console.log(id)
+            const result= await cartCollection.deleteOne({orderItemId:id})
+            res.send(result)
+        })
+
+
         console.log("connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
