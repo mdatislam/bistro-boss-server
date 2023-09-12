@@ -30,6 +30,25 @@ async function run() {
         const foodCollection = client.db('Bistro-Boss').collection('foodItem')
         const reviewCollection = client.db('Bistro-Boss').collection('review')
         const cartCollection = client.db('Bistro-Boss').collection('cart')
+        const userCollection = client.db('Bistro-Boss').collection('user')
+
+
+        app.get('/users', async (req, res) => {
+            const result = await userCollection.find({}).toArray()
+            res.send({users:result})
+        })
+
+
+        app.post('/users', async (req, res) => {
+            const userInfo = req.body
+            const query = { email: userInfo.email }
+            const existingUser = await userCollection.findOne(query)
+            if (existingUser) {
+                return res.send({ message: 'user already exist' })
+            }
+            const result = await userCollection.insertOne(userInfo)
+            res.send(result)
+        })
 
         app.post('/food', async (req, res) => {
             console.log(user)
@@ -50,24 +69,24 @@ async function run() {
 
         // cart collection
 
-        app.post('/cart',async(req,res)=>{
-            const cartInfo= req.body 
+        app.post('/cart', async (req, res) => {
+            const cartInfo = req.body
             //console.log(cartInfo)
             const result = await cartCollection.insertOne(cartInfo)
             res.send(result)
         })
 
-        app.get('/carts',async(req,res)=>{
-            const email= req.query.email
+        app.get('/carts', async (req, res) => {
+            const email = req.query.email
             //console.log(email)
-            const result= await cartCollection.find({email:email}).toArray()
-            res.send({data:result})
+            const result = await cartCollection.find({ email: email }).toArray()
+            res.send({ data: result })
         })
 
-         app.delete('/cart/:id',async(req,res)=>{
-            const id= req.params.id
+        app.delete('/cart/:id', async (req, res) => {
+            const id = req.params.id
             //console.log(id)
-            const result= await cartCollection.deleteOne({orderItemId:id})
+            const result = await cartCollection.deleteOne({ orderItemId: id })
             res.send(result)
         })
 
