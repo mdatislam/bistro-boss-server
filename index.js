@@ -1,13 +1,33 @@
 const express = require('express')
 const app = express()
 const cors = require('cors')
+const jwt = require('jsonwebtoken');
 require('dotenv').config()
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000
 
 
 app.use(cors())
 app.use(express.json())
+
+
+function verifyJWT(req, res, next) {
+    const authHeader = req.headers.authentication
+    if (!authHeader) {
+        return res.status(403).send({ msg: 'unauthorize access' })
+    }
+    const token = authHeader.split(' ')[1]
+    console.log(token)
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+        if (err) {
+            return res.status(401).send({ msg: 'Access forbidden' })
+        }
+        req.decoded = decoded
+        next()
+    });
+
+
+}
 
 
 
@@ -23,6 +43,8 @@ const client = new MongoClient(uri, {
     }
 });
 
+
+
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
@@ -32,21 +54,51 @@ async function run() {
         const cartCollection = client.db('Bistro-Boss').collection('cart')
         const userCollection = client.db('Bistro-Boss').collection('user')
 
+        /* JWT api */
+        app.post('/jwt', async (req, res) => {
+            const user = req.body
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+            res.send({token:token})
+        })
 
-        app.get('/users', async (req, res) => {
+        app.get('/users', verifyJWT, async (req, res) => {
             const result = await userCollection.find({}).toArray()
-            res.send({users:result})
+            res.send({ users: result })
         })
 
 
         app.post('/users', async (req, res) => {
             const userInfo = req.body
             const query = { email: userInfo.email }
+            
             const existingUser = await userCollection.findOne(query)
             if (existingUser) {
-                return res.send({ message: 'user already exist' })
+                return res.send({ msg: 'user exist' })
             }
             const result = await userCollection.insertOne(userInfo)
+            res.send( result)
+        })
+
+        app.patch('/users/admin/:id', async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: new ObjectId(id) }
+            //console.log(filter)
+            const updateDocs = {
+                $set: {
+                    role: 'admin'
+                }
+            }
+
+            const result = await userCollection.updateOne(filter, updateDocs)
+            res.send(result)
+        })
+
+        app.delete('/users/:id', async (req, res) => {
+            const id = req.params.id
+            //console.log(id)
+            const filter = { _id: new ObjectId(id) }
+            // console.log(filter)
+            const result = await userCollection.deleteOne(filter)
             res.send(result)
         })
 
