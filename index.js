@@ -12,7 +12,7 @@ app.use(express.json())
 
 
 function verifyJWT(req, res, next) {
-    const authHeader = req.headers.authentication
+    const authHeader = req.headers.authorization
     if (!authHeader) {
         return res.status(403).send({ msg: 'unauthorize access' })
     }
@@ -58,28 +58,52 @@ async function run() {
         app.post('/jwt', async (req, res) => {
             const user = req.body
             const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
-            res.send({token:token})
+            res.send({ token: token })
         })
+          // Warning: use verifyJWT before using verifyAdmin
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded.email
+            const query = { email: email }
+            const user = await userCollection.findOne(query)
+            if (user?.role !== 'admin') {
+                return res.status(403).send({ error: true, message: 'forbidden message' });
+            }
+           next()
+        }
 
-        app.get('/users', verifyJWT, async (req, res) => {
+        app.get('/users', verifyJWT,verifyAdmin, async (req, res) => {
             const result = await userCollection.find({}).toArray()
             res.send({ users: result })
         })
 
+        /* Check Admin api */
 
-        app.post('/users', async (req, res) => {
+        app.get('/users/admin/:email', verifyJWT, async (req, res) => {
+            const userEmail = req.params.email
+            if (req.decoded.email !== userEmail) {
+                res.send({ admin: false })
+            }
+            const query = { email: userEmail }
+            const userInfo = await userCollection.findOne(query)
+            const result = { admin: userInfo?.role === 'admin' }
+            res.send(result)
+
+        })
+
+
+        app.post('/users', verifyJWT, async (req, res) => {
             const userInfo = req.body
             const query = { email: userInfo.email }
-            
+
             const existingUser = await userCollection.findOne(query)
             if (existingUser) {
                 return res.send({ msg: 'user exist' })
             }
             const result = await userCollection.insertOne(userInfo)
-            res.send( result)
+            res.send(result)
         })
 
-        app.patch('/users/admin/:id', async (req, res) => {
+        app.patch('/users/admin/:id', verifyJWT, async (req, res) => {
             const id = req.params.id
             const filter = { _id: new ObjectId(id) }
             //console.log(filter)
@@ -93,7 +117,7 @@ async function run() {
             res.send(result)
         })
 
-        app.delete('/users/:id', async (req, res) => {
+        app.delete('/users/:id', verifyJWT, async (req, res) => {
             const id = req.params.id
             //console.log(id)
             const filter = { _id: new ObjectId(id) }
@@ -102,7 +126,7 @@ async function run() {
             res.send(result)
         })
 
-        app.post('/food', async (req, res) => {
+        app.post('/food', verifyJWT, async (req, res) => {
             console.log(user)
             const result = await foodCollection.insertOne(user)
             res.send(result)
@@ -121,21 +145,21 @@ async function run() {
 
         // cart collection
 
-        app.post('/cart', async (req, res) => {
+        app.post('/cart', verifyJWT, async (req, res) => {
             const cartInfo = req.body
             //console.log(cartInfo)
             const result = await cartCollection.insertOne(cartInfo)
             res.send(result)
         })
 
-        app.get('/carts', async (req, res) => {
+        app.get('/carts', verifyJWT, async (req, res) => {
             const email = req.query.email
             //console.log(email)
             const result = await cartCollection.find({ email: email }).toArray()
             res.send({ data: result })
         })
 
-        app.delete('/cart/:id', async (req, res) => {
+        app.delete('/cart/:id', verifyJWT, async (req, res) => {
             const id = req.params.id
             //console.log(id)
             const result = await cartCollection.deleteOne({ orderItemId: id })
