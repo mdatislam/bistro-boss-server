@@ -17,7 +17,7 @@ function verifyJWT(req, res, next) {
         return res.status(403).send({ msg: 'unauthorize access' })
     }
     const token = authHeader.split(' ')[1]
-    console.log(token)
+    //console.log(token)
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
         if (err) {
             return res.status(401).send({ msg: 'Access forbidden' })
@@ -127,8 +127,9 @@ async function run() {
         })
 
         app.post('/food', verifyJWT, async (req, res) => {
-            console.log(user)
-            const result = await foodCollection.insertOne(user)
+            const foodInfo= req.body
+            //console.log(user)
+            const result = await foodCollection.insertOne(foodInfo)
             res.send(result)
         })
 
