@@ -3,6 +3,7 @@ const app = express()
 const cors = require('cors')
 const jwt = require('jsonwebtoken');
 require('dotenv').config()
+const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000
 
@@ -53,6 +54,7 @@ async function run() {
         const reviewCollection = client.db('Bistro-Boss').collection('review')
         const cartCollection = client.db('Bistro-Boss').collection('cart')
         const userCollection = client.db('Bistro-Boss').collection('user')
+        const paymentCollection = client.db('Bistro-Boss').collection('payments')
 
         /* JWT api */
         app.post('/jwt', async (req, res) => {
@@ -60,7 +62,7 @@ async function run() {
             const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
             res.send({ token: token })
         })
-          // Warning: use verifyJWT before using verifyAdmin
+        // Warning: use verifyJWT before using verifyAdmin
         const verifyAdmin = async (req, res, next) => {
             const email = req.decoded.email
             const query = { email: email }
@@ -68,10 +70,10 @@ async function run() {
             if (user?.role !== 'admin') {
                 return res.status(403).send({ error: true, message: 'forbidden message' });
             }
-           next()
+            next()
         }
 
-        app.get('/users', verifyJWT,verifyAdmin, async (req, res) => {
+        app.get('/users', verifyJWT, verifyAdmin, async (req, res) => {
             const result = await userCollection.find({}).toArray()
             res.send({ users: result })
         })
@@ -127,7 +129,7 @@ async function run() {
         })
 
         app.post('/food', verifyJWT, async (req, res) => {
-            const foodInfo= req.body
+            const foodInfo = req.body
             //console.log(user)
             const result = await foodCollection.insertOne(foodInfo)
             res.send(result)
@@ -165,6 +167,56 @@ async function run() {
             //console.log(id)
             const result = await cartCollection.deleteOne({ orderItemId: id })
             res.send(result)
+        })
+        // create payment intent api
+        app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+            const { price } = req.body
+            const amount = price * 100
+            //console.log(amount)
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                payment_method_types: ['card']
+            });
+
+            res.send({
+                clientSecret: paymentIntent.client_secret
+            })
+        })
+
+        // save payment info
+
+        app.post('/payment',verifyJWT,async(req,res)=>{
+            const paymentInfo= req.body 
+            const insertPayment = await paymentCollection.insertOne(paymentInfo)
+            const query= {_id:{$in:paymentInfo.cartItems.map(id=> new ObjectId(id))}}
+            const deletePaidItems= await cartCollection.deleteMany(query)
+            res.send({insertPayment,deletePaidItems})
+        })
+
+        // Resturent summary api
+
+        app.get('/admin-states',verifyJWT, verifyAdmin,async(req,res)=>{
+            const totalCustomer= await userCollection.estimatedDocumentCount() 
+            const totalProducts= await foodCollection.estimatedDocumentCount() 
+            const totalOrder = await paymentCollection.estimatedDocumentCount()
+            // to use reduce function
+            const  payments = await paymentCollection.find({}).toArray()
+            const totalRevenue = payments.reduce((sum,payment)=>sum+payment.price,0)
+
+            // to use group operator
+           /*  const revenue= await paymentCollection.aggregate([
+                {
+                    $group:{
+                        _id:null,
+                        total:{$sum:$price}
+                    }
+                }
+            ]).toArray() */
+            res.send({totalCustomer,totalProducts, totalOrder,totalRevenue})
+
+
         })
 
 
