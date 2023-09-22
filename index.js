@@ -59,7 +59,7 @@ async function run() {
         /* JWT api */
         app.post('/jwt', async (req, res) => {
             const user = req.body
-            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1hr' });
             res.send({ token: token })
         })
         // Warning: use verifyJWT before using verifyAdmin
@@ -206,17 +206,52 @@ async function run() {
             const totalRevenue = payments.reduce((sum,payment)=>sum+payment.price,0)
 
             // to use group operator
-           /*  const revenue= await paymentCollection.aggregate([
+            const revenue= await paymentCollection.aggregate([
                 {
                     $group:{
                         _id:null,
-                        total:{$sum:$price}
+                        total:{$sum:'$price'}
                     }
                 }
-            ]).toArray() */
-            res.send({totalCustomer,totalProducts, totalOrder,totalRevenue})
+            ]).toArray()
+           // console.log(revenue)
+            const totalRevenue2= revenue[0].total
+            res.send({totalCustomer,totalProducts, totalOrder,totalRevenue,totalRevenue2})
 
 
+        })
+
+        app.get('/order-states',verifyJWT,async(req,res)=>{
+            const pipeline=[
+                {
+                    $lookup:{
+                        from:"foodItem",
+                        localField:"menuItems",
+                        foreignField:"_id",
+                        as:'menuItemData'
+                    }
+                },
+                {
+                    $unwind:"$menuItemData"
+                },
+                {
+                    $group:{
+                        _id:"$menuItemData.category",
+                        count:{$sum:1},
+                        totalAmount:{$sum:"$menuItemData.price"}
+                    }
+                },
+                {
+                    $project:{
+                        category:"$_id",
+                        count:1,
+                        totalAmount:{$round:["$totalAmount",2]},
+                        _id:0
+                    }
+                }
+            ]
+            const result= await paymentCollection.aggregate(pipeline).toArray()
+            res.send(result)
         })
 
 
