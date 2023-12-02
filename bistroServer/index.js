@@ -128,42 +128,15 @@ async function run() {
             res.send(result)
         })
 
-        app.post('/food', async (req, res) => {
+        app.post('/food', verifyJWT, async (req, res) => {
             const foodInfo = req.body
-           // console.log(foodInfo)
+            //console.log(user)
             const result = await foodCollection.insertOne(foodInfo)
             res.send(result)
         })
 
         app.get('/food', async (req, res) => {
             const result = await foodCollection.find({}).toArray()
-            res.send(result)
-        })
-        app.get('/food/:id', async (req, res) => {
-            const id = req.params.id
-           // console.log(id)
-            const filter = { _id: id }
-            const result = await foodCollection.findOne(filter)
-            res.send(result)
-        })
-
-        app.put('/food/:id', async (req, res) => {
-            const id = req.params.id
-            const filter = { _id: new ObjectId(id) }
-            const options = { upsert: true }
-            const updateData = req.body
-            const updateDocs = {
-                $set: updateData
-            }
-            const result = await foodCollection.updateOne(filter, updateDocs, options)
-            res.send(result)
-        })
-
-        app.delete('/food/:id', async (req, res) => {
-            const id = req.params.id
-            //console.log(id)
-            const filter = { _id: new ObjectId(id) }
-            const result = await foodCollection.deleteOne(filter)
             res.send(result)
         })
 
@@ -214,70 +187,70 @@ async function run() {
 
         // save payment info
 
-        app.post('/payment', verifyJWT, async (req, res) => {
-            const paymentInfo = req.body
+        app.post('/payment',verifyJWT,async(req,res)=>{
+            const paymentInfo= req.body 
             const insertPayment = await paymentCollection.insertOne(paymentInfo)
-            const query = { _id: { $in: paymentInfo.cartItems.map(id => new ObjectId(id)) } }
-            const deletePaidItems = await cartCollection.deleteMany(query)
-            res.send({ insertPayment, deletePaidItems })
+            const query= {_id:{$in:paymentInfo.cartItems.map(id=> new ObjectId(id))}}
+            const deletePaidItems= await cartCollection.deleteMany(query)
+            res.send({insertPayment,deletePaidItems})
         })
 
         // Resturent summary api
 
-        app.get('/admin-states', verifyJWT, verifyAdmin, async (req, res) => {
-            const totalCustomer = await userCollection.estimatedDocumentCount()
-            const totalProducts = await foodCollection.estimatedDocumentCount()
+        app.get('/admin-states',verifyJWT, verifyAdmin,async(req,res)=>{
+            const totalCustomer= await userCollection.estimatedDocumentCount() 
+            const totalProducts= await foodCollection.estimatedDocumentCount() 
             const totalOrder = await paymentCollection.estimatedDocumentCount()
             // to use reduce function
-            const payments = await paymentCollection.find({}).toArray()
-            const totalRevenue = payments.reduce((sum, payment) => sum + payment.price, 0)
+            const  payments = await paymentCollection.find({}).toArray()
+            const totalRevenue = payments.reduce((sum,payment)=>sum+payment.price,0)
 
             // to use group operator
-            const revenue = await paymentCollection.aggregate([
+            const revenue= await paymentCollection.aggregate([
                 {
-                    $group: {
-                        _id: null,
-                        total: { $sum: '$price' }
+                    $group:{
+                        _id:null,
+                        total:{$sum:'$price'}
                     }
                 }
             ]).toArray()
-            // console.log(revenue)
-            const totalRevenue2 = revenue[0].total
-            res.send({ totalCustomer, totalProducts, totalOrder, totalRevenue, totalRevenue2 })
+           // console.log(revenue)
+            const totalRevenue2= revenue[0].total
+            res.send({totalCustomer,totalProducts, totalOrder,totalRevenue,totalRevenue2})
 
 
         })
 
-        app.get('/order-states', async (req, res) => {
-            const pipeline = [
+        app.get('/order-states',async(req,res)=>{
+            const pipeline=[
                 {
-                    $lookup: {
-                        from: "foodItem",
-                        localField: "menuItems",
-                        foreignField: "_id",
-                        as: 'menuItemData'
+                    $lookup:{
+                        from:"foodItem",
+                        localField:"menuItems",
+                        foreignField:"_id",
+                        as:'menuItemData'
+                    }
+                },
+                 {
+                    $unwind:"$menuItemData"
+                },
+                  {
+                    $group:{
+                        _id:"$menuItemData.category",
+                        count:{$sum:1},
+                        totalAmount:{$sum:"$menuItemData.price"}
                     }
                 },
                 {
-                    $unwind: "$menuItemData"
-                },
-                {
-                    $group: {
-                        _id: "$menuItemData.category",
-                        count: { $sum: 1 },
-                        totalAmount: { $sum: "$menuItemData.price" }
+                    $project:{
+                        category:"$_id",
+                        count:1,
+                        totalAmount:{$round:["$totalAmount",2]},
+                        _id:0
                     }
-                },
-                {
-                    $project: {
-                        category: "$_id",
-                        count: 1,
-                        totalAmount: { $round: ["$totalAmount", 2] },
-                        _id: 0
-                    }
-                }
+                }  
             ]
-            const result = await paymentCollection.aggregate(pipeline).toArray()
+            const result= await paymentCollection.aggregate(pipeline).toArray()
             res.send(result)
         })
 
