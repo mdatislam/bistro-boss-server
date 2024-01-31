@@ -142,13 +142,14 @@ async function run() {
         app.get('/food/:id', async (req, res) => {
             const id = req.params.id
            // console.log(id)
-            const filter = { _id: id }
+            const filter = { _id: new ObjectId(id) }
             const result = await foodCollection.findOne(filter)
             res.send(result)
         })
 
         app.put('/food/:id', async (req, res) => {
             const id = req.params.id
+            //console.log(id);
             const filter = { _id: new ObjectId(id) }
             const options = { upsert: true }
             const updateData = req.body
@@ -293,6 +294,10 @@ run().catch(console.dir);
 
 app.get('/', (req, res) => {
     res.send({ message: "Bistro-server Running" })
+})
+
+app.get('/bistro', (req, res) => {
+    res.send({ message: "Bistro-other route" })
 })
 
 app.listen(port, () => console.log(`Bistro-server Running on ${port}`))
